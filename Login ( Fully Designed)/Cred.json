@@ -1,0 +1,22 @@
+{
+  "Users": [
+    {
+      "Username": "Aviel",
+      "Password": "123",
+      "Services": [
+        "MPGWAPIC",
+        "MPGWDOAR",
+        "MPGW-MOH-Tangram",
+        "Testing MPGW",
+        "A NEW MPGW BIG NAME TESTING IT NOW IS IT GONNA WORK"
+      ]
+    },
+    {
+      "Username": "Marg",
+      "Password": "321",
+      "Services": [
+        "MPGWDOAR"
+      ]
+    }
+  ]
+}
