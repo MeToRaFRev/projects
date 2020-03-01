@@ -2,7 +2,9 @@ import requests
 import tkinter
 import json
 import webbrowser
+import base64
 from tkinter import messagebox
+from tkinter import simpledialog
 from tkinter import ttk
 import urllib3
 urllib3.disable_warnings()
@@ -36,11 +38,14 @@ mgmtTab = tkinter.Frame(tabs)
 dnsTab = tkinter.Frame(tabs)
 ethernetTab = tkinter.Frame(tabs)
 certificateTab = tkinter.Frame(tabs)
+mpgwTab = tkinter.Frame(tabs)
+
 tabs.add(systemTab, text='System')
 tabs.add(mgmtTab, text='Management')
 tabs.add(dnsTab, text='DNS')
 tabs.add(ethernetTab, text='Ethernet')
 tabs.add(certificateTab, text='Certificates')
+tabs.add(mpgwTab, text='MPGW')
 #End
 tabs.pack(expand=1, fill='both')
 
@@ -299,4 +304,46 @@ for cert in json.loads(Certificate_data.text)['CryptoCertificate']:
 tkinter.Button(certificateTab,text='View Certificate',command=lambda:viewCrt()).place(relx=0.13,rely=0.9,anchor='c')
 
 #Certificate Tab Stop
+#MPGW Tab Start
+def changeList(*args):
+    MPGW_data = requests.get(BaseURL+'mgmt/config/{}/MultiProtocolGateway'.format(domain.get()),auth=(Username,Password),verify=False,timeout=3)
+    MPGW_data = json.loads(MPGW_data.text)['MultiProtocolGateway']
+    mpgwList.delete(0,'end')
+    if type(MPGW_data) == list:
+        for mpgw in MPGW_data:
+            mpgwList.insert('end',mpgw['name'])
+    if type(MPGW_data) == dict:
+        mpgwList.insert('end',MPGW_data['name'])
+
+def changeName():
+    choosenMPGW = mpgwList.get(str(mpgwList.curselection()).replace(',','').replace('(','').replace(')',''))
+    choosenDomain = domain.get()
+    newName = tkinter.simpledialog.askstring('Name','MPGW Name:')
+    cfgFile = requests.get(BaseURL+'mgmt/filestore/{}/config/{}.cfg'.format(choosenDomain,choosenDomain),auth=(Username,Password),verify=False,timeout=3)
+    cfgFile = base64.b64decode(json.loads(cfgFile.text)['file']).decode('ascii')
+    cfgFile = cfgFile.replace('mpgw "{}"'.format(choosenMPGW),'mpgw "{}"'.format(newName))
+    cfgFile = base64.b64encode(cfgFile.encode('ascii'))
+    data = {"file":{"name":"","content":""}}
+    fileName = choosenDomain+'.cfg'
+    data["file"]["name"] = fileName
+    data["file"]["content"] = cfgFile.decode('ascii')
+    print(data)
+    changedName = requests.put(BaseURL+'mgmt/filestore/{}/config/{}.cfg'.format(choosenDomain,choosenDomain),json=data,auth=(Username,Password),verify=False,timeout=3)
+    print(changedName.text)
+
+Domains_data = requests.get(BaseURL+'mgmt/status/default/DomainStatus',auth=(Username,Password),verify=False,timeout=3)
+DomainsJSON = json.loads(Domains_data.text)['DomainStatus']
+Domains = []
+mpgwList = tkinter.Listbox(mpgwTab,selectmode='single')
+mpgwList.place(relx=0.01,rely=0.55,anchor='w',relwidth=0.35,relheight=0.9)
+for Domain in DomainsJSON:
+    Domains.append(Domain['Domain'])
+domain = tkinter.StringVar(mpgwTab)
+domain.set("default")
+Domains_List = tkinter.OptionMenu(mpgwTab,domain,*Domains)
+Domains_List.place(relx=0.18,rely=0.05,anchor='c',relheight=0.1)
+domain.trace('w',changeList)
+changeName_Button = tkinter.Button(mpgwTab,text='Change Name',command=lambda:changeName())
+changeName_Button.place(relx=0.5,rely=0.5)
+#MPGW Tab Stop
 MainWindow.mainloop()
