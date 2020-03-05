@@ -7,11 +7,12 @@ from tkinter import messagebox
 from tkinter import simpledialog
 from tkinter import ttk
 import urllib3
+import re
 urllib3.disable_warnings()
 #Parameters
-BaseURL = 'https://127.0.0.1:5554/'
-Username = 'admin'
-Password = 'admin'
+BaseURL = 'https://192.168.104.73:5554/'
+Username = 'rest-test'
+Password = '123321123'
 Virtual = False
 #End
 #DPOnline Check
@@ -58,8 +59,14 @@ def AdvStorage(Storage):
     TotalInternal = json.loads(Storage.text)['FilesystemStatus']['TotalInternal']
     tkinter.messagebox.showinfo('Advanced Storage','Free Encrypted: {} MB\nTotal Encrypted: {} MB\nFree Temporary: {} MB\nTotal Temporary: {} MB\nFree Internal: {} MB\nTotal Internal: {} MB'.format(FreeEncrypted,TotalEncrypted,FreeTemporary,TotalTemporary,FreeInternal,TotalInternal))
 
+DatapowerDefault = requests.get(BaseURL+'mgmt/status/',auth=(Username,Password),verify=False,timeout=3)
+if "'FirmwareVersion'" in json.loads(DatapowerDefault.text)['_links']:
+    Firmware = requests.get(BaseURL+'mgmt/status/default/FirmwareVersion',auth=(Username,Password),verify=False,timeout=3)
+if "'FirmwareVersion2'" in json.loads(DatapowerDefault.text)['_links']:
+    Firmware = requests.get(BaseURL+'mgmt/status/default/FirmwareVersion2',auth=(Username,Password),verify=False,timeout=3)
+if "FirmwareVersion3" in json.loads(DatapowerDefault.text)['_links']:
+    Firmware = requests.get(BaseURL+'mgmt/status/default/FirmwareVersion3',auth=(Username,Password),verify=False,timeout=3)
 
-Firmware = requests.get(BaseURL+'mgmt/status/default/FirmwareVersion3',auth=(Username,Password),verify=False,timeout=3)
 VirtualData = requests.get(BaseURL+'mgmt/status/default/Hypervisor3',auth=(Username,Password),verify=False,timeout=3)
 FirmwareVersion = json.loads(Firmware.text)['FirmwareVersion3']['Version']
 Model = json.loads(Firmware.text)['FirmwareVersion3']['ModelType']
@@ -149,7 +156,7 @@ Users = requests.get(BaseURL+'mgmt/status/default/ActiveUsers',auth=(Username,Pa
 usersList = tkinter.Listbox(mgmtTab)
 usersList.place(relx=0.775,rely=0.55,anchor='center',relwidth=0.45,relheight=0.9)
 tkinter.Label(mgmtTab,text='Active Users').place(relx=0.775,rely=0.05,anchor='center')
-if json.loads(Users.text)['ActiveUsers'] == list:
+if type(json.loads(Users.text)['ActiveUsers']) == list:
     for user in json.loads(Users.text)['ActiveUsers']:
         if user['name'] == '':
             usersList.insert('end','IDG : '+user['address']+' → '+user['connection'])
@@ -167,7 +174,7 @@ mgmtTab.focus()
 def resetDnsList(dnsList):
     dnsList.config(state='normal')
     dnsList.delete('0','end')
-    if '"DNSCacheHostStatus4"' in json.loads(DNSCacheHostStatus4.text):
+    if "DNSCacheHostStatus4" in json.loads(DNSCacheHostStatus4.text):
         for dns in json.loads(DNSCacheHostStatus4.text)['DNSCacheHostStatus4']:
             dnsList.insert('end',dns['Hostname']+' → '+dns['IPAddress'])
     else:
@@ -194,7 +201,7 @@ aliasList.place(relx=0.25,rely=0.675,anchor='center',relwidth=0.5)
 tkinter.Label(dnsTab,text='Aliases').place(relx=0.25,rely=0.3,anchor='center')
 DNSCacheHostStatus4 = requests.get(BaseURL+'mgmt/status/default/DNSCacheHostStatus4',auth=(Username,Password),verify=False,timeout=3)
 DNSSearchDomainStatus = requests.get(BaseURL+'mgmt/status/default/DNSSearchDomainStatus',auth=(Username,Password),verify=False,timeout=3)
-if '"DNSSearchDomainStatus"' in DNSSearchDomainStatus.text:
+if "DNSSearchDomainStatus" in json.loads(DNSSearchDomainStatus.text):
     dnsDomain = json.loads(DNSSearchDomainStatus.text)['DNSSearchDomainStatus']['SearchDomain']
 else:
     dnsDomain = 'NaN'
@@ -220,6 +227,86 @@ tkinter.Button(dnsTab,relief='flat',command=lambda:DNSServers(),text='Domain: '+
 dnsTab.focus()
 #DNS Tab End
 #Ethernet Tab Start
+
+def Ping():
+    data = {"Ping":{"RemoteHost":""}}
+    if not DNSResolve.get():
+        if re.match('^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}$',IP_Entry.get()):
+            data['Ping']['RemoteHost'] = IP_Entry.get()
+            Ping_Button.config(cursor='wait')
+            resp = requests.post(BaseURL+'mgmt/actionqueue/default',json=data,auth=(Username,Password),verify=False)
+            if 'Operation completed' in resp.text:
+                Alert_Label.config(text='Operation Successful',fg='green')
+                Ping_Button.config(cursor='arrow')
+            elif 'Host unreachable' in resp.text:
+                Alert_Label.config(text='Operation Failed - host unreachable',fg='red')
+                Ping_Button.config(cursor='arrow')
+            elif 'Failed to resolve host name' in resp.text:
+                Alert_Label.config(text='Operation Failed - cant resolve Hostname',fg='red')
+                Ping_Button.config(cursor='arrow')
+            else:
+                Alert_Label.config(text='Operation Failed',fg='red')
+                Ping_Button.config(cursor='arrow')
+        else:
+            tkinter.messagebox.showerror('Error','IPv4 is not valid (0.0.0.0 - 255.255.255.255)')
+    if DNSResolve.get():
+        if re.match('^[^:\/\/]+$',IP_Entry.get()):
+            data['Ping']['RemoteHost'] = IP_Entry.get()
+            Ping_Button.config(cursor='wait')
+            resp = requests.post(BaseURL+'mgmt/actionqueue/default',json=data,auth=(Username,Password),verify=False)
+            if 'Operation completed' in resp.text:
+                Alert_Label.config(text='URL has been resolved successfuly',fg='green')
+                Ping_Button.config(cursor='arrow')
+            elif 'Failed to resolve host name' in resp.text:
+                Alert_Label.config(text='Operation Failed - cannot resolve hostname',fg='red')
+                Ping_Button.config(cursor='arrow')
+            else:
+                Alert_Label.config(text='Operation Failed',fg='red')
+                Ping_Button.config(cursor='arrow')
+        else:
+            tkinter.messagebox.showerror('Error','URL is not valid (must be the url only)')
+
+def Telnet():
+        data = {"TCPConnectionTest":{"RemoteHost":"","RemotePort":""}}
+        if re.match('^[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}:[0-9]{1,5}$',URL_Entry.get()):
+            IP = URL_Entry.get().split(':')[0]
+            PORT = URL_Entry.get().split(':')[1]
+            data['TCPConnectionTest']['RemoteHost'] = IP
+            data['TCPConnectionTest']['RemotePort'] = PORT
+            Telnet_Button.config(cursor='wait')
+            resp = requests.post(BaseURL+'mgmt/actionqueue/default',json=data,auth=(Username,Password),verify=False)
+            if 'Operation completed' in resp.text:
+                Alert_Label.config(text='Operation Successful',fg='green')
+                Telnet_Button.config(cursor='arrow')
+            elif 'connection refused' in resp.text:
+                Alert_Label.config(text='Operation Failed - connection refused',fg='red')
+                Telnet_Button.config(cursor='arrow')
+            elif 'Port is out-of-range' in resp.text:
+                Alert_Label.config(text='Operation Failed - Port is out-of-range',fg='red')
+                Telnet_Button.config(cursor='arrow')
+            else:
+                Alert_Label.config(text='Operation Failed',fg='red')
+                Telnet_Button.config(cursor='arrow')
+        else:
+            tkinter.messagebox.showerror('Error','IPv4 or port are not valid (0.0.0.0:0 - 255.255.255.255:65535)')
+
+IP_Entry = tkinter.Entry(ethernetTab)
+Ping_Button = tkinter.Button(ethernetTab,text='Ping',command=lambda:Ping())
+Alert_Label = tkinter.Label(ethernetTab,text='')
+DNSResolve = tkinter.BooleanVar(ethernetTab)
+DNSResolve_Checkbox = tkinter.Checkbutton(ethernetTab,padx=0.1 ,text='DNS Resolve', variable = DNSResolve, onvalue = True, offvalue = False)
+IP_Entry.place(relx=0.25,rely=0.6,anchor='w')
+Ping_Button.place(relx=0.43,rely=0.7,anchor='w')
+DNSResolve_Checkbox.place(relx=0.24,rely=0.7,anchor='w')
+Alert_Label.place(relx=0.525,rely=0.9,anchor='center')
+
+URL_Entry = tkinter.Entry(ethernetTab)
+Telnet_Button = tkinter.Button(ethernetTab,text='Telnet',command=lambda:Telnet())
+URL_Entry.place(relx=0.575,rely=0.6,anchor='w')
+Telnet_Button.place(relx=0.735,rely=0.7,anchor='w')
+
+
+
 interfaces = requests.get(BaseURL+'mgmt/status/default/EthernetInterfaceStatus',auth=(Username,Password),verify=False,timeout=3)
 CPM = requests.get(BaseURL+'mgmt/status/default/ConnectionsAccepted',auth=(Username,Password),verify=False,timeout=3)
 if '"ConnectionsAccepted"' in CPM.text:
@@ -244,7 +331,7 @@ ListeningConn.place(relx=0.2,rely=0.45,anchor='w')
 
 def showInfo():
     interfaceName = interfaceList.get(str(interfaceList.curselection()).replace(',','').replace('(','').replace(')',''))
-    if '"EthernetInterfaceStatus"' in json.loads(interfaces.text):
+    if "EthernetInterfaceStatus" in json.loads(interfaces.text):
         for interface in json.loads(interfaces.text)['EthernetInterfaceStatus']:
             if interfaceName == interface['Name']:
                 IP_Label.config(text='IP: '+interface['IP'])
@@ -355,16 +442,32 @@ def changeName():
     choosenMPGW = mpgwList.get(str(mpgwList.curselection()).replace(',','').replace('(','').replace(')',''))
     choosenDomain = domain.get()
     newName = tkinter.simpledialog.askstring('Name','MPGW Name:')
+    if not re.match('^[a-zA-Z0-9_-]*$',newName):
+        tkinter.messagebox.showerror('Error','Name of MPGW cannot have any character but english letters , numbers and _ -')
+        return
+
     cfgFile = requests.get(BaseURL+'mgmt/filestore/{}/config/{}.cfg'.format(choosenDomain,choosenDomain),auth=(Username,Password),verify=False,timeout=3)
     cfgFile = base64.b64decode(json.loads(cfgFile.text)['file']).decode('ascii')
-    cfgFile = cfgFile.replace('mpgw "{}"'.format(choosenMPGW),'mpgw "{}"'.format(newName))
+    if not allObjects.get():
+        cfgFile = cfgFile.replace('mpgw "{}"'.format(choosenMPGW),'mpgw "{}"'.format(newName))
+    if allObjects.get():
+        cfgFile = cfgFile.replace('mpgw "{}"'.format(choosenMPGW),'mpgw "{}"'.format(newName))
+        cfgFile = cfgFile.replace('policy-attachments "{}"'.format(choosenMPGW),'policy-attachments "{}"'.format(newName))
+        cfgFile = cfgFile.replace('front-protocol {}'.format(choosenMPGW),'front-protocol {}'.format(newName))
+        cfgFile = cfgFile.replace('policy-attachments {}'.format(choosenMPGW),'policy-attachments {}'.format(newName))
+        cfgFile = cfgFile.replace('source-http "{}"'.format(choosenMPGW),'source-http "{}"'.format(newName))
+        cfgFile = cfgFile.replace('mpgw "{}"'.format(choosenMPGW),'mpgw "{}"'.format(newName))
+
     cfgFile = base64.b64encode(cfgFile.encode('ascii'))
     data = {"file":{"name":"","content":""}}
+    dato = {"RestartDomain":{"Domain":""}}
+    dato["RestartDomain"]["Domain"] = choosenDomain
     fileName = choosenDomain+'.cfg'
     data["file"]["name"] = fileName
     data["file"]["content"] = cfgFile.decode('ascii')
     changedName = requests.put(BaseURL+'mgmt/filestore/{}/config/{}.cfg'.format(choosenDomain,choosenDomain),json=data,auth=(Username,Password),verify=False,timeout=3)
-    print(changedName.text)
+    restartDomain = requests.post(BaseURL+'mgmt/actionqueue/{}'.format(choosenDomain),json=dato,auth=(Username,Password),verify=False,timeout=3)
+
 
 Domains_data = requests.get(BaseURL+'mgmt/status/default/DomainStatus',auth=(Username,Password),verify=False,timeout=3)
 DomainsJSON = json.loads(Domains_data.text)['DomainStatus']
@@ -378,7 +481,11 @@ domain.set("default")
 Domains_List = tkinter.OptionMenu(mpgwTab,domain,*Domains)
 Domains_List.place(relx=0.18,rely=0.05,anchor='c',relheight=0.1)
 domain.trace('w',changeList)
+allObjects = tkinter.BooleanVar(mpgwTab)
+allObjects_Checkbox = tkinter.Checkbutton(mpgwTab,text='Child Objects', variable = allObjects,onvalue = True, offvalue = False)
+allObjects_Checkbox.place(relx=0.55,rely=0.155,anchor='w')
 changeName_Button = tkinter.Button(mpgwTab,text='Change Name',command=lambda:changeName())
-changeName_Button.place(relx=0.5,rely=0.5)
+changeName_Button.place(relx=0.37,rely=0.155,anchor='w')
 #MPGW Tab Stop
+
 MainWindow.mainloop()
