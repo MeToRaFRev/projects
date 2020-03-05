@@ -9,9 +9,9 @@ from tkinter import ttk
 import urllib3
 urllib3.disable_warnings()
 #Parameters
-BaseURL = 'https://192.168.104.73:5554/'
-Username = 'rest-test'
-Password = '123321123'
+BaseURL = 'https://127.0.0.1:5554/'
+Username = 'admin'
+Password = 'admin'
 Virtual = False
 #End
 #DPOnline Check
@@ -64,14 +64,22 @@ VirtualData = requests.get(BaseURL+'mgmt/status/default/Hypervisor3',auth=(Usern
 FirmwareVersion = json.loads(Firmware.text)['FirmwareVersion3']['Version']
 Model = json.loads(Firmware.text)['FirmwareVersion3']['ModelType']
 CPU = requests.get(BaseURL+'mgmt/status/default/CPUUsage',auth=(Username,Password),verify=False,timeout=3)
-CPUUsage = json.loads(CPU.text)['CPUUsage']['tenSeconds']
+if '"CPUUsage"' in CPU.text:
+    CPUUsage = json.loads(CPU.text)['CPUUsage']['tenSeconds']
+else:
+    CPUUsage = 'NaN'
 UP = requests.get(BaseURL+'mgmt/status/default/DateTimeStatus',auth=(Username,Password),verify=False,timeout=3)
 UPTime = json.loads(UP.text)['DateTimeStatus']['uptime2']
 Time = json.loads(UP.text)['DateTimeStatus']['time'].split(' ')
 MainWindow.title('Datapower Information Tool : {}'.format(Time[3]))
 Memory = requests.get(BaseURL+'mgmt/status/default/MemoryStatus',auth=(Username,Password),verify=False,timeout=3)
-MemoryMax = int(round(json.loads(Memory.text)['MemoryStatus']['TotalMemory']/1000000, 0))
-MemoryUsed = int(round(json.loads(Memory.text)['MemoryStatus']['UsedMemory']/1000000, 0))
+if '"MemoryStatus"' in Memory.text:
+    MemoryMax = int(round(json.loads(Memory.text)['MemoryStatus']['TotalMemory']/1000000, 0))
+    MemoryUsed = int(round(json.loads(Memory.text)['MemoryStatus']['UsedMemory']/1000000, 0))
+else:
+    MemoryMax = 'NaN'
+    MemoryUsed = 'NaN'
+
 Storage = requests.get(BaseURL+'mgmt/status/default/FilesystemStatus',auth=(Username,Password),verify=False,timeout=3)
 TotalEncrypted = round(json.loads(Storage.text)['FilesystemStatus']['TotalEncrypted']/1000, 2)
 UsedEncrypted = round(TotalEncrypted - round(json.loads(Storage.text)['FilesystemStatus']['FreeEncrypted']/1000, 1),1)
@@ -97,6 +105,10 @@ if Checked:
     Licensed = 'Yes'
 
 NTP = requests.get(BaseURL+'mgmt/status/default/NTPRefreshStatus',auth=(Username,Password),verify=False,timeout=3)
+if '"NTPRefreshStatus"' in NTP.text:
+    NTPRefresh = json.loads(NTP.text)['NTPRefreshStatus']['LastRefreshIndex']
+else:
+    NTPRefresh = 'NaN'
 
 
 tkinter.Label(systemTab,text='Firmware: {}'.format(FirmwareVersion)).place(relx=0.01,rely=0.2,anchor='w')
@@ -106,7 +118,7 @@ tkinter.Label(systemTab,text='Memory: {}/{} GB'.format(MemoryUsed,MemoryMax)).pl
 tkinter.Label(systemTab,text='CPU: {}%'.format(CPUUsage)).place(relx=0.01,rely=0.7,anchor='w')
 tkinter.Button(systemTab,text='Storage: {}/{} GB'.format(UsedEncrypted,TotalEncrypted),relief='flat',command=lambda:AdvStorage(Storage)).place(relx=0.01,rely=0.7,anchor='w')
 tkinter.Label(systemTab,text='License: {}'.format(Licensed)).place(relx=0.01,rely=0.8,anchor='w')
-tkinter.Label(systemTab,text='NTP Server: '+json.loads(NTP.text)['NTPRefreshStatus']['LastRefreshIndex']).place(relx=0.6,rely=0.1,anchor='w')
+tkinter.Label(systemTab,text='NTP Server: '+NTPRefresh).place(relx=0.6,rely=0.1,anchor='w')
 systemTab.focus()
 #System Tab End
 
@@ -137,19 +149,30 @@ Users = requests.get(BaseURL+'mgmt/status/default/ActiveUsers',auth=(Username,Pa
 usersList = tkinter.Listbox(mgmtTab)
 usersList.place(relx=0.775,rely=0.55,anchor='center',relwidth=0.45,relheight=0.9)
 tkinter.Label(mgmtTab,text='Active Users').place(relx=0.775,rely=0.05,anchor='center')
-for user in json.loads(Users.text)['ActiveUsers']:
-    if user['name'] == '':
+if json.loads(Users.text)['ActiveUsers'] == list:
+    for user in json.loads(Users.text)['ActiveUsers']:
+        if user['name'] == '':
+            usersList.insert('end','IDG : '+user['address']+' → '+user['connection'])
+        else:
+            usersList.insert('end',user['name']+' : '+user['address']+' → '+user['connection'])
+else:
+    if json.loads(Users.text)['ActiveUsers']['name'] == '':
         usersList.insert('end','IDG : '+user['address']+' → '+user['connection'])
     else:
-        usersList.insert('end',user['name']+' : '+user['address']+' → '+user['connection'])
+        usersList.insert('end',json.loads(Users.text)['ActiveUsers']['name']+' : '+json.loads(Users.text)['ActiveUsers']['address']+' → '+json.loads(Users.text)['ActiveUsers']['connection'])
 
 mgmtTab.focus()
 #Management Tab End
 #DNS Tab Start
 def resetDnsList(dnsList):
+    dnsList.config(state='normal')
     dnsList.delete('0','end')
-    for dns in json.loads(DNSCacheHostStatus4.text)['DNSCacheHostStatus4']:
-        dnsList.insert('end',dns['Hostname']+' → '+dns['IPAddress'])
+    if '"DNSCacheHostStatus4"' in json.loads(DNSCacheHostStatus4.text):
+        for dns in json.loads(DNSCacheHostStatus4.text)['DNSCacheHostStatus4']:
+            dnsList.insert('end',dns['Hostname']+' → '+dns['IPAddress'])
+    else:
+        dnsList.insert('end','No DNS was found')
+        dnsList.config(state='disabled')
 
 def searchDnsList(dnsList,term):
     exist = False
@@ -171,6 +194,10 @@ aliasList.place(relx=0.25,rely=0.675,anchor='center',relwidth=0.5)
 tkinter.Label(dnsTab,text='Aliases').place(relx=0.25,rely=0.3,anchor='center')
 DNSCacheHostStatus4 = requests.get(BaseURL+'mgmt/status/default/DNSCacheHostStatus4',auth=(Username,Password),verify=False,timeout=3)
 DNSSearchDomainStatus = requests.get(BaseURL+'mgmt/status/default/DNSSearchDomainStatus',auth=(Username,Password),verify=False,timeout=3)
+if '"DNSSearchDomainStatus"' in DNSSearchDomainStatus.text:
+    dnsDomain = json.loads(DNSSearchDomainStatus.text)['DNSSearchDomainStatus']['SearchDomain']
+else:
+    dnsDomain = 'NaN'
 Aliases = requests.get(BaseURL+'mgmt/status/default/DNSStaticHostStatus',auth=(Username,Password),verify=False,timeout=3)
 for alias in json.loads(Aliases.text)['DNSStaticHostStatus']:
     aliasList.insert('end',alias['Hostname']+' → '+alias['IPAddress'])
@@ -189,12 +216,17 @@ searchButton = tkinter.Button(dnsTab,text='Search →',command=lambda:searchDnsL
 searchButton.place(relx=0.25,rely=0.15,anchor='w',relheight=0.075)
 resetButton = tkinter.Button(dnsTab,text='Reset',command=lambda:resetDnsList(dnsList))
 resetButton.place(relx=0.375,rely=0.15,anchor='w',relheight=0.075)
-tkinter.Button(dnsTab,relief='flat',command=lambda:DNSServers(),text='Domain: '+json.loads(DNSSearchDomainStatus.text)['DNSSearchDomainStatus']['SearchDomain']).place(relx=0.01,rely=0.01)
+tkinter.Button(dnsTab,relief='flat',command=lambda:DNSServers(),text='Domain: '+dnsDomain).place(relx=0.01,rely=0.01)
 dnsTab.focus()
 #DNS Tab End
 #Ethernet Tab Start
 interfaces = requests.get(BaseURL+'mgmt/status/default/EthernetInterfaceStatus',auth=(Username,Password),verify=False,timeout=3)
 CPM = requests.get(BaseURL+'mgmt/status/default/ConnectionsAccepted',auth=(Username,Password),verify=False,timeout=3)
+if '"ConnectionsAccepted"' in CPM.text:
+    CPM_Param = str(json.loads(CPM.text)['ConnectionsAccepted']['oneMinute'])
+else:
+    CPM_Param = 'NaN'
+
 Estab = requests.get(BaseURL+'mgmt/status/default/TCPSummary',auth=(Username,Password),verify=False,timeout=3)
 ports = requests.get(BaseURL+'mgmt/status/default/TCPTable',auth=(Username,Password),verify=False,timeout=3)
 IP_Label = tkinter.Label(ethernetTab,text='IP: 0.0.0.0')
@@ -203,7 +235,7 @@ MAC_Label = tkinter.Label(ethernetTab,text='MAC: 00:00:00:00:00:00')
 MAC_Label.place(relx=0.2,rely=0.15,anchor='w')
 PORTS_Label = tkinter.Label(ethernetTab,text='PORTS')
 PORTS_Label.place(relx=0.9,rely=0.05,anchor='w')
-CPM_Label = tkinter.Label(ethernetTab,text='CPM: '+str(json.loads(CPM.text)['ConnectionsAccepted']['oneMinute']))
+CPM_Label = tkinter.Label(ethernetTab,text='CPM: '+CPM_Param)
 CPM_Label.place(relx=0.2,rely=0.25,anchor='w')
 EstablishedConn = tkinter.Label(ethernetTab,text='Established: '+str(json.loads(Estab.text)['TCPSummary']['established']))
 EstablishedConn.place(relx=0.2,rely=0.35,anchor='w')
@@ -212,10 +244,14 @@ ListeningConn.place(relx=0.2,rely=0.45,anchor='w')
 
 def showInfo():
     interfaceName = interfaceList.get(str(interfaceList.curselection()).replace(',','').replace('(','').replace(')',''))
-    for interface in json.loads(interfaces.text)['EthernetInterfaceStatus']:
-        if interfaceName == interface['Name']:
-            IP_Label.config(text='IP: '+interface['IP'])
-            MAC_Label.config(text='MAC: '+interface['MACAddress'])
+    if '"EthernetInterfaceStatus"' in json.loads(interfaces.text):
+        for interface in json.loads(interfaces.text)['EthernetInterfaceStatus']:
+            if interfaceName == interface['Name']:
+                IP_Label.config(text='IP: '+interface['IP'])
+                MAC_Label.config(text='MAC: '+interface['MACAddress'])
+    else:
+        IP_Label.config(text='IP: NaN')
+        MAC_Label.config(text='MAC: ')
 
 def showPort():
     for port in json.loads(ports.text)['TCPTable']:
@@ -327,7 +363,6 @@ def changeName():
     fileName = choosenDomain+'.cfg'
     data["file"]["name"] = fileName
     data["file"]["content"] = cfgFile.decode('ascii')
-    print(data)
     changedName = requests.put(BaseURL+'mgmt/filestore/{}/config/{}.cfg'.format(choosenDomain,choosenDomain),json=data,auth=(Username,Password),verify=False,timeout=3)
     print(changedName.text)
 
