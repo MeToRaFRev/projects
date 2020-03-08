@@ -24,6 +24,9 @@ except:
 
 try:
         resp = requests.get(BaseURL+'mgmt/status/default/Hypervisor3',auth=(Username,Password),verify=False,timeout=1)
+        if resp.status_code == 401:
+            tkinter.messagebox.showerror('Datapower Information','Datapower : Credetials are wrong')
+            exit()
         UUID = json.loads(resp.text)['Hypervisor3']['UUID']
         Virtual=True
 except:
@@ -39,14 +42,14 @@ mgmtTab = tkinter.Frame(tabs)
 dnsTab = tkinter.Frame(tabs)
 ethernetTab = tkinter.Frame(tabs)
 certificateTab = tkinter.Frame(tabs)
-mpgwTab = tkinter.Frame(tabs)
+gatewayTab = tkinter.Frame(tabs)
 
 tabs.add(systemTab, text='System')
 tabs.add(mgmtTab, text='Management')
 tabs.add(dnsTab, text='DNS')
 tabs.add(ethernetTab, text='Ethernet')
 tabs.add(certificateTab, text='Certificates')
-tabs.add(mpgwTab, text='MPGW')
+tabs.add(gatewayTab, text='Gateway')
 #End
 tabs.pack(expand=1, fill='both')
 
@@ -133,9 +136,19 @@ MGMT = requests.get(BaseURL+'mgmt/status/default/ServicesStatus',auth=(Username,
 WebGUI_IP = '';WebGUI_PORT = '';REST_IP = '';REST_PORT = '';XML_IP = '';XML_PORT = ''
 
 #Management Tab Start
-tkinter.Label(mgmtTab,text='Management Interfaces:').place(relx=0.01,rely=0.05,anchor='w')
 def openGUI(IP,PORT):
     webbrowser.open_new('https://'+str(IP)+':'+str(PORT))
+
+def changePassword():
+        data={"ChangePassword":{"OldPassword":Password,"Password":""}}
+        newPassword = tkinter.simpledialog.askstring('New Password','Password:')
+        data['ChangePassword']['Password'] = newPassword
+        resp = requests.post(BaseURL+'mgmt/actionqueue/default',json=data,auth=(Username,Password),verify=False,timeout=3)
+        if resp.status_code == 200:
+            tkinter.messagebox.showinfo('Datapower Information','Update password at the script and enter again')
+            exit()
+        if 'previously' in resp.text:
+            tkinter.messagebox.showinfo('Datapower Information','Cannot use the same password. try again')
 
 for i in range(3):
     tmp = json.loads(MGMT.text)['ServicesStatus'][i]['ServiceName']
@@ -152,6 +165,7 @@ for i in range(3):
         XML_PORT = json.loads(MGMT.text)['ServicesStatus'][i]['LocalPort']
         tkinter.Button(mgmtTab,relief='flat',command=lambda:openGUI(XML_IP,XML_PORT),text='SOAP API: {}:{}'.format(XML_IP,XML_PORT)).place(relx=0.01,rely=0.35,anchor='w')
 
+tkinter.Label(mgmtTab,text='Management Interfaces:').place(relx=0.01,rely=0.05,anchor='w')
 Users = requests.get(BaseURL+'mgmt/status/default/ActiveUsers',auth=(Username,Password),verify=False,timeout=3)
 usersList = tkinter.Listbox(mgmtTab)
 usersList.place(relx=0.775,rely=0.55,anchor='center',relwidth=0.45,relheight=0.9)
@@ -168,15 +182,31 @@ else:
     else:
         usersList.insert('end',json.loads(Users.text)['ActiveUsers']['name']+' : '+json.loads(Users.text)['ActiveUsers']['address']+' → '+json.loads(Users.text)['ActiveUsers']['connection'])
 
+
+tkinter.Label(mgmtTab,text='Current User : '+Username).place(relx=0.01,rely=0.5,anchor='w')
+changePassword_Button = tkinter.Button(mgmtTab,text='Change Password',command=lambda:changePassword())
+changePassword_Button.place(relx=0.3,rely=0.5,anchor='w',relheight=0.075)
+
 mgmtTab.focus()
 #Management Tab End
 #DNS Tab Start
+def DNSCache():
+    data = {"FlushDNSCache":""}
+    resp = requests.post(BaseURL+'mgmt/actionqueue/default',json=data,auth=(Username,Password),verify=False,timeout=3)
+    if resp.status_code == 200:
+        tkinter.messagebox.showinfo('Datapower Information','DNS Cache Refreshed Successfully')
+    else:
+        tkinter.messagebox.showerror('Datapower Information','Something went wrong')
+
 def resetDnsList(dnsList):
     dnsList.config(state='normal')
     dnsList.delete('0','end')
     if "DNSCacheHostStatus4" in json.loads(DNSCacheHostStatus4.text):
-        for dns in json.loads(DNSCacheHostStatus4.text)['DNSCacheHostStatus4']:
-            dnsList.insert('end',dns['Hostname']+' → '+dns['IPAddress'])
+        if type(json.loads(DNSCacheHostStatus4.text)['DNSCacheHostStatus4']) == list:
+            dnsList.insert('end',json.loads(DNSCacheHostStatus4.text)['DNSCacheHostStatus4'][0]['Hostname'] + ' → ' + json.loads(DNSCacheHostStatus4.text)['DNSCacheHostStatus4'][0]['IPAddress'])
+        else:
+            for dns in json.loads(DNSCacheHostStatus4.text)['DNSCacheHostStatus4']:
+                dnsList.insert('end',dns['Hostname']+' → '+dns['IPAddress'])
     else:
         dnsList.insert('end','No DNS was found')
         dnsList.config(state='disabled')
@@ -224,6 +254,9 @@ searchButton.place(relx=0.25,rely=0.15,anchor='w',relheight=0.075)
 resetButton = tkinter.Button(dnsTab,text='Reset',command=lambda:resetDnsList(dnsList))
 resetButton.place(relx=0.375,rely=0.15,anchor='w',relheight=0.075)
 tkinter.Button(dnsTab,relief='flat',command=lambda:DNSServers(),text='Domain: '+dnsDomain).place(relx=0.01,rely=0.01)
+
+tkinter.Button(dnsTab,text='Refresh Cache',command=lambda:DNSCache()).place(relx=0.01,rely=0.225,relheight=0.075)
+
 dnsTab.focus()
 #DNS Tab End
 #Ethernet Tab Start
@@ -255,7 +288,7 @@ def Ping():
             Ping_Button.config(cursor='wait')
             resp = requests.post(BaseURL+'mgmt/actionqueue/default',json=data,auth=(Username,Password),verify=False)
             if 'Operation completed' in resp.text:
-                Alert_Label.config(text='URL has been resolved successfuly',fg='green')
+                Alert_Label.config(text='URL has been resolved successfully',fg='green')
                 Ping_Button.config(cursor='arrow')
             elif 'Failed to resolve host name' in resp.text:
                 Alert_Label.config(text='Operation Failed - cannot resolve hostname',fg='red')
@@ -295,15 +328,15 @@ Ping_Button = tkinter.Button(ethernetTab,text='Ping',command=lambda:Ping())
 Alert_Label = tkinter.Label(ethernetTab,text='')
 DNSResolve = tkinter.BooleanVar(ethernetTab)
 DNSResolve_Checkbox = tkinter.Checkbutton(ethernetTab,padx=0.1 ,text='DNS Resolve', variable = DNSResolve, onvalue = True, offvalue = False)
-IP_Entry.place(relx=0.25,rely=0.6,anchor='w')
-Ping_Button.place(relx=0.43,rely=0.7,anchor='w')
-DNSResolve_Checkbox.place(relx=0.24,rely=0.7,anchor='w')
-Alert_Label.place(relx=0.525,rely=0.9,anchor='center')
+IP_Entry.place(relx=0.25,rely=0.75,anchor='w')
+Ping_Button.place(relx=0.43,rely=0.85,anchor='w')
+DNSResolve_Checkbox.place(relx=0.24,rely=0.85,anchor='w')
+Alert_Label.place(relx=0.525,rely=0.95,anchor='center')
 
 URL_Entry = tkinter.Entry(ethernetTab)
 Telnet_Button = tkinter.Button(ethernetTab,text='Telnet',command=lambda:Telnet())
-URL_Entry.place(relx=0.575,rely=0.6,anchor='w')
-Telnet_Button.place(relx=0.735,rely=0.7,anchor='w')
+URL_Entry.place(relx=0.575,rely=0.75,anchor='w')
+Telnet_Button.place(relx=0.735,rely=0.85,anchor='w')
 
 
 
@@ -427,36 +460,71 @@ for cert in json.loads(Certificate_data.text)['CryptoCertificate']:
 tkinter.Button(certificateTab,text='View Certificate',command=lambda:viewCrt()).place(relx=0.13,rely=0.9,anchor='c')
 
 #Certificate Tab Stop
-#MPGW Tab Start
+#Gateway Tab Start
+def RefreshWSDL():
+    WSGateway = requests.get(BaseURL+'mgmt/config/{}/WSGateway'.format(domain.get()),auth=(Username,Password),verify=False,timeout=3)
+    choosenWSP = wspList.get(str(wspList.curselection()).replace(',','').replace('(','').replace(')',''))
+    data = {"RefreshWSDL":{"WSGateway":"","WSDL":""}}
+    data['RefreshWSDL']['WSGateway'] = choosenWSP
+    if type(json.loads(WSGateway.text)['WSGateway']) == list:
+        for wsdl in json.loads(WSGateway.text)['WSGateway']:
+            if wsdl['name'] == choosenWSP:
+                for source in wsdl['BaseWSDL']:
+                    data['RefreshWSDL']['WSDL'] = source['WSDLSourceLocation']
+                    resp = requests.post(BaseURL+'mgmt/actionqueue/{}'.format(domain.get()),json=data,auth=(Username,Password),verify=False,timeout=3)
+    if type(json.loads(WSGateway.text)['WSGateway']) == dict:
+        if json.loads(WSGateway.text)['WSGateway']['name'] == choosenWSP:
+            data['RefreshWSDL']['WSDL'] = json.loads(WSGateway.text)['WSGateway']['BaseWSDL']['WSDLSourceLocation']
+            resp = requests.post(BaseURL+'mgmt/actionqueue/{}'.format(domain.get()),json=data,auth=(Username,Password),verify=False,timeout=3)
+
+
 def changeList(*args):
-    MPGW_data = requests.get(BaseURL+'mgmt/config/{}/MultiProtocolGateway'.format(domain.get()),auth=(Username,Password),verify=False,timeout=3)
-    MPGW_data = json.loads(MPGW_data.text)['MultiProtocolGateway']
+    wspList.config(state='normal')
+    mpgwList.config(state='normal')
+    MPGateway = requests.get(BaseURL+'mgmt/config/{}/MultiProtocolGateway'.format(domain.get()),auth=(Username,Password),verify=False,timeout=3)
+    WSGateway = requests.get(BaseURL+'mgmt/config/{}/WSGateway'.format(domain.get()),auth=(Username,Password),verify=False,timeout=3)
     mpgwList.delete(0,'end')
-    if type(MPGW_data) == list:
-        for mpgw in MPGW_data:
-            mpgwList.insert('end',mpgw['name'])
-    if type(MPGW_data) == dict:
-        mpgwList.insert('end',MPGW_data['name'])
+    wspList.delete(0,'end')
+    if 'No configuration retrieved' in WSGateway.text:
+        wspList.insert('end','No WSP Found')
+        wspList.config(state='disabled')
+    else:
+        WSGateway = json.loads(WSGateway.text)['WSGateway']
+        if type(WSGateway) == list:
+            for wsp in WSGateway:
+                wspList.insert('end',wsp['name'])
+        if type(WSGateway) == dict:
+            wspList.insert('end',WSGateway['name'])
+    if 'No configuration retrieved' in MPGateway.text:
+        mpgwList.insert('end','No MPGW Found')
+        mpgwList.config(state='disabled')
+    else:
+        MPGateway = json.loads(MPGateway.text)['MultiProtocolGateway']
+        if type(MPGateway) == list:
+            for mpgw in MPGateway:
+                mpgwList.insert('end',mpgw['name'])
+        if type(MPGateway) == dict:
+            mpgwList.insert('end',MPGateway['name'])
 
 def changeName():
-    choosenMPGW = mpgwList.get(str(mpgwList.curselection()).replace(',','').replace('(','').replace(')',''))
+    choosenGateway = mpgwList.get(str(mpgwList.curselection()).replace(',','').replace('(','').replace(')',''))
     choosenDomain = domain.get()
-    newName = tkinter.simpledialog.askstring('Name','MPGW Name:')
+    newName = tkinter.simpledialog.askstring('Name','Gateway Name:')
     if not re.match('^[a-zA-Z0-9_-]*$',newName):
-        tkinter.messagebox.showerror('Error','Name of MPGW cannot have any character but english letters , numbers and _ -')
+        tkinter.messagebox.showerror('Error','Name of Gateway cannot have any character but english letters , numbers and _ -')
         return
 
     cfgFile = requests.get(BaseURL+'mgmt/filestore/{}/config/{}.cfg'.format(choosenDomain,choosenDomain),auth=(Username,Password),verify=False,timeout=3)
     cfgFile = base64.b64decode(json.loads(cfgFile.text)['file']).decode('ascii')
     if not allObjects.get():
-        cfgFile = cfgFile.replace('mpgw "{}"'.format(choosenMPGW),'mpgw "{}"'.format(newName))
+        cfgFile = cfgFile.replace('mpgw "{}"'.format(choosenGateway),'mpgw "{}"'.format(newName))
     if allObjects.get():
-        cfgFile = cfgFile.replace('mpgw "{}"'.format(choosenMPGW),'mpgw "{}"'.format(newName))
-        cfgFile = cfgFile.replace('policy-attachments "{}"'.format(choosenMPGW),'policy-attachments "{}"'.format(newName))
-        cfgFile = cfgFile.replace('front-protocol {}'.format(choosenMPGW),'front-protocol {}'.format(newName))
-        cfgFile = cfgFile.replace('policy-attachments {}'.format(choosenMPGW),'policy-attachments {}'.format(newName))
-        cfgFile = cfgFile.replace('source-http "{}"'.format(choosenMPGW),'source-http "{}"'.format(newName))
-        cfgFile = cfgFile.replace('mpgw "{}"'.format(choosenMPGW),'mpgw "{}"'.format(newName))
+        cfgFile = cfgFile.replace('mpgw "{}"'.format(choosenGateway),'mpgw "{}"'.format(newName))
+        cfgFile = cfgFile.replace('policy-attachments "{}"'.format(choosenGateway),'policy-attachments "{}"'.format(newName))
+        cfgFile = cfgFile.replace('front-protocol {}'.format(choosenGateway),'front-protocol {}'.format(newName))
+        cfgFile = cfgFile.replace('policy-attachments {}'.format(choosenGateway),'policy-attachments {}'.format(newName))
+        cfgFile = cfgFile.replace('source-http "{}"'.format(choosenGateway),'source-http "{}"'.format(newName))
+        cfgFile = cfgFile.replace('mpgw "{}"'.format(choosenGateway),'mpgw "{}"'.format(newName))
 
     cfgFile = base64.b64encode(cfgFile.encode('ascii'))
     data = {"file":{"name":"","content":""}}
@@ -472,20 +540,27 @@ def changeName():
 Domains_data = requests.get(BaseURL+'mgmt/status/default/DomainStatus',auth=(Username,Password),verify=False,timeout=3)
 DomainsJSON = json.loads(Domains_data.text)['DomainStatus']
 Domains = []
-mpgwList = tkinter.Listbox(mpgwTab,selectmode='single')
-mpgwList.place(relx=0.01,rely=0.55,anchor='w',relwidth=0.35,relheight=0.9)
+mpgwList = tkinter.Listbox(gatewayTab,selectmode='single')
+mpgwList.place(relx=0.01,rely=0.5,anchor='w',relwidth=0.25,relheight=1)
+tkinter.Label(gatewayTab,text='← MPGW').place(relx=0.26,rely=0.05,anchor='w')
+wspList = tkinter.Listbox(gatewayTab,selectmode='single')
+wspList.place(relx=0.99,rely=0.5,anchor='e',relwidth=0.25,relheight=1)
+tkinter.Label(gatewayTab,text='WSP →').place(relx=0.74,rely=0.05,anchor='e')
 for Domain in DomainsJSON:
     Domains.append(Domain['Domain'])
-domain = tkinter.StringVar(mpgwTab)
+domain = tkinter.StringVar(gatewayTab)
 domain.set("default")
-Domains_List = tkinter.OptionMenu(mpgwTab,domain,*Domains)
-Domains_List.place(relx=0.18,rely=0.05,anchor='c',relheight=0.1)
+Domains_List = tkinter.OptionMenu(gatewayTab,domain,*Domains)
+Domains_List.place(relx=0.5,rely=0.05,anchor='c',relheight=0.1)
 domain.trace('w',changeList)
-allObjects = tkinter.BooleanVar(mpgwTab)
-allObjects_Checkbox = tkinter.Checkbutton(mpgwTab,text='Child Objects', variable = allObjects,onvalue = True, offvalue = False)
-allObjects_Checkbox.place(relx=0.55,rely=0.155,anchor='w')
-changeName_Button = tkinter.Button(mpgwTab,text='Change Name',command=lambda:changeName())
-changeName_Button.place(relx=0.37,rely=0.155,anchor='w')
-#MPGW Tab Stop
+allObjects = tkinter.BooleanVar(gatewayTab)
+allObjects_Checkbox = tkinter.Checkbutton(gatewayTab,text='Child Objects', variable = allObjects,onvalue = True, offvalue = False)
+allObjects_Checkbox.place(relx=0.26,rely=0.315,anchor='w')
+changeName_Button = tkinter.Button(gatewayTab,text='Change Name',command=lambda:changeName())
+changeName_Button.place(relx=0.265,rely=0.225,anchor='w')
+## WIP
+RefreshWSDL_Button = tkinter.Button(gatewayTab,text='Refresh WSDL',command=lambda:RefreshWSDL())
+RefreshWSDL_Button.place(relx=0.735,rely=0.225,anchor='e')
+#Gateway Tab Stop
 
 MainWindow.mainloop()
