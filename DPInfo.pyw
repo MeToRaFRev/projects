@@ -12,7 +12,7 @@ urllib3.disable_warnings()
 #Parameters
 BaseURL = 'https://192.168.104.73:5554/'
 Username = 'rest-test'
-Password = '123321123'
+Password = '123321'
 Virtual = False
 #End
 #DPOnline Check
@@ -38,18 +38,18 @@ MainWindow.resizable(False,False)
 tabs = tkinter.ttk.Notebook(MainWindow)
 #Add Tabs
 systemTab = tkinter.Frame(tabs)
-mgmtTab = tkinter.Frame(tabs)
 dnsTab = tkinter.Frame(tabs)
 ethernetTab = tkinter.Frame(tabs)
 certificateTab = tkinter.Frame(tabs)
 gatewayTab = tkinter.Frame(tabs)
+userTab = tkinter.Frame(tabs)
 
 tabs.add(systemTab, text='System')
-tabs.add(mgmtTab, text='Management')
 tabs.add(dnsTab, text='DNS')
 tabs.add(ethernetTab, text='Ethernet')
 tabs.add(certificateTab, text='Certificates')
 tabs.add(gatewayTab, text='Gateway')
+tabs.add(userTab, text='Users')
 #End
 tabs.pack(expand=1, fill='both')
 
@@ -128,67 +128,33 @@ tkinter.Label(systemTab,text='Memory: {}/{} GB'.format(MemoryUsed,MemoryMax)).pl
 tkinter.Label(systemTab,text='CPU: {}%'.format(CPUUsage)).place(relx=0.01,rely=0.7,anchor='w')
 tkinter.Button(systemTab,text='Storage: {}/{} GB'.format(UsedEncrypted,TotalEncrypted),relief='flat',command=lambda:AdvStorage(Storage)).place(relx=0.01,rely=0.7,anchor='w')
 tkinter.Label(systemTab,text='License: {}'.format(Licensed)).place(relx=0.01,rely=0.8,anchor='w')
-tkinter.Label(systemTab,text='NTP Server: '+NTPRefresh).place(relx=0.6,rely=0.1,anchor='w')
-systemTab.focus()
-#System Tab End
+tkinter.Label(systemTab,text='NTP Server: '+NTPRefresh).place(relx=0.01,rely=0.9,anchor='w')
 
-MGMT = requests.get(BaseURL+'mgmt/status/default/ServicesStatus',auth=(Username,Password),verify=False,timeout=3)
-WebGUI_IP = '';WebGUI_PORT = '';REST_IP = '';REST_PORT = '';XML_IP = '';XML_PORT = ''
-
-#Management Tab Start
 def openGUI(IP,PORT):
     webbrowser.open_new('https://'+str(IP)+':'+str(PORT))
 
-def changePassword():
-        data={"ChangePassword":{"OldPassword":Password,"Password":""}}
-        newPassword = tkinter.simpledialog.askstring('New Password','Password:')
-        data['ChangePassword']['Password'] = newPassword
-        resp = requests.post(BaseURL+'mgmt/actionqueue/default',json=data,auth=(Username,Password),verify=False,timeout=3)
-        if resp.status_code == 200:
-            tkinter.messagebox.showinfo('Datapower Information','Update password at the script and enter again')
-            exit()
-        if 'previously' in resp.text:
-            tkinter.messagebox.showinfo('Datapower Information','Cannot use the same password. try again')
+tkinter.Label(systemTab,text='Management Interfaces:').place(relx=0.65,rely=0.05,anchor='w')
+MGMT = requests.get(BaseURL+'mgmt/status/default/ServicesStatus',auth=(Username,Password),verify=False,timeout=3)
+WebGUI_IP = '';WebGUI_PORT = '';REST_IP = '';REST_PORT = '';XML_IP = '';XML_PORT = ''
 
 for i in range(3):
     tmp = json.loads(MGMT.text)['ServicesStatus'][i]['ServiceName']
     if tmp == 'web-mgmt':
         WebGUI_IP = json.loads(MGMT.text)['ServicesStatus'][i]['LocalIP']
         WebGUI_PORT = json.loads(MGMT.text)['ServicesStatus'][i]['LocalPort']
-        tkinter.Button(mgmtTab,relief='flat',command=lambda:openGUI(WebGUI_IP,WebGUI_PORT),text='Web GUI: {}:{}'.format(WebGUI_IP,WebGUI_PORT)).place(relx=0.01,rely=0.15,anchor='w')
+        tkinter.Button(systemTab,relief='flat',command=lambda:openGUI(WebGUI_IP,WebGUI_PORT),text='Web GUI: {}:{}'.format(WebGUI_IP,WebGUI_PORT)).place(relx=0.65,rely=0.15,anchor='w')
     if tmp == 'rest-mgmt':
         REST_IP = json.loads(MGMT.text)['ServicesStatus'][i]['LocalIP']
         REST_PORT = json.loads(MGMT.text)['ServicesStatus'][i]['LocalPort']
-        tkinter.Button(mgmtTab,relief='flat',command=lambda:openGUI(REST_IP,REST_PORT),text='REST API: {}:{}'.format(REST_IP,REST_PORT)).place(relx=0.01,rely=0.25,anchor='w')
+        tkinter.Button(systemTab,relief='flat',command=lambda:openGUI(REST_IP,REST_PORT),text='REST API: {}:{}'.format(REST_IP,REST_PORT)).place(relx=0.65,rely=0.25,anchor='w')
     if tmp == 'xml-mgmt':
         XML_IP = json.loads(MGMT.text)['ServicesStatus'][i]['LocalIP']
         XML_PORT = json.loads(MGMT.text)['ServicesStatus'][i]['LocalPort']
-        tkinter.Button(mgmtTab,relief='flat',command=lambda:openGUI(XML_IP,XML_PORT),text='SOAP API: {}:{}'.format(XML_IP,XML_PORT)).place(relx=0.01,rely=0.35,anchor='w')
-
-tkinter.Label(mgmtTab,text='Management Interfaces:').place(relx=0.01,rely=0.05,anchor='w')
-Users = requests.get(BaseURL+'mgmt/status/default/ActiveUsers',auth=(Username,Password),verify=False,timeout=3)
-usersList = tkinter.Listbox(mgmtTab)
-usersList.place(relx=0.775,rely=0.55,anchor='center',relwidth=0.45,relheight=0.9)
-tkinter.Label(mgmtTab,text='Active Users').place(relx=0.775,rely=0.05,anchor='center')
-if type(json.loads(Users.text)['ActiveUsers']) == list:
-    for user in json.loads(Users.text)['ActiveUsers']:
-        if user['name'] == '':
-            usersList.insert('end','IDG : '+user['address']+' → '+user['connection'])
-        else:
-            usersList.insert('end',user['name']+' : '+user['address']+' → '+user['connection'])
-else:
-    if json.loads(Users.text)['ActiveUsers']['name'] == '':
-        usersList.insert('end','IDG : '+user['address']+' → '+user['connection'])
-    else:
-        usersList.insert('end',json.loads(Users.text)['ActiveUsers']['name']+' : '+json.loads(Users.text)['ActiveUsers']['address']+' → '+json.loads(Users.text)['ActiveUsers']['connection'])
+        tkinter.Button(systemTab,relief='flat',command=lambda:openGUI(XML_IP,XML_PORT),text='SOAP API: {}:{}'.format(XML_IP,XML_PORT)).place(relx=0.65,rely=0.35,anchor='w')
 
 
-tkinter.Label(mgmtTab,text='Current User : '+Username).place(relx=0.01,rely=0.5,anchor='w')
-changePassword_Button = tkinter.Button(mgmtTab,text='Change Password',command=lambda:changePassword())
-changePassword_Button.place(relx=0.3,rely=0.5,anchor='w',relheight=0.075)
-
-mgmtTab.focus()
-#Management Tab End
+systemTab.focus()
+#System Tab End
 #DNS Tab Start
 def DNSCache():
     data = {"FlushDNSCache":""}
@@ -203,10 +169,10 @@ def resetDnsList(dnsList):
     dnsList.delete('0','end')
     if "DNSCacheHostStatus4" in json.loads(DNSCacheHostStatus4.text):
         if type(json.loads(DNSCacheHostStatus4.text)['DNSCacheHostStatus4']) == list:
-            dnsList.insert('end',json.loads(DNSCacheHostStatus4.text)['DNSCacheHostStatus4'][0]['Hostname'] + ' → ' + json.loads(DNSCacheHostStatus4.text)['DNSCacheHostStatus4'][0]['IPAddress'])
-        else:
             for dns in json.loads(DNSCacheHostStatus4.text)['DNSCacheHostStatus4']:
                 dnsList.insert('end',dns['Hostname']+' → '+dns['IPAddress'])
+        else:
+            dnsList.insert('end',json.loads(DNSCacheHostStatus4.text)['DNSCacheHostStatus4'][0]['Hostname'] + ' → ' + json.loads(DNSCacheHostStatus4.text)['DNSCacheHostStatus4'][0]['IPAddress'])
     else:
         dnsList.insert('end','No DNS was found')
         dnsList.config(state='disabled')
@@ -225,7 +191,7 @@ def searchDnsList(dnsList,term):
 
 dnsList = tkinter.Listbox(dnsTab)
 dnsList.place(relx=0.75,rely=0.55,anchor='center',relwidth=0.5,relheight=0.9)
-tkinter.Label(dnsTab,text='DNS Static Hosts').place(relx=0.75,rely=0.05,anchor='center')
+tkinter.Label(dnsTab,text='DNS Cached Hosts').place(relx=0.75,rely=0.05,anchor='center')
 aliasList = tkinter.Listbox(dnsTab)
 aliasList.place(relx=0.25,rely=0.675,anchor='center',relwidth=0.5)
 tkinter.Label(dnsTab,text='Aliases').place(relx=0.25,rely=0.3,anchor='center')
@@ -389,8 +355,8 @@ interfaceList = tkinter.Listbox(ethernetTab,selectmode='single')
 interfaceList.place(relx=0.1,rely=0.45,anchor='center',relheight=0.9,relwidth=0.2)
 portList = tkinter.Listbox(ethernetTab,selectmode='single')
 portList.place(relx=0.95,rely=0.5,anchor='center',relheight=0.8,relwidth=0.15)
-showPortButton = tkinter.Button(ethernetTab,text='Adv Info',command=lambda:showPort())
-showPortButton.place(relx=0.935,rely=0.95,anchor='center',relheight=0.075,relwidth=0.1)
+showPortButton = tkinter.Button(ethernetTab,text='Show Info',command=lambda:showPort())
+showPortButton.place(relx=0.935,rely=0.95,anchor='center',relheight=0.075,relwidth=0.125)
 showInfoButton = tkinter.Button(ethernetTab,text='Show Info',command=lambda:showInfo())
 showInfoButton.place(relx=0.1,rely=0.95,anchor='center',relheight=0.075)
 for interface in json.loads(interfaces.text)['EthernetInterfaceStatus']:
@@ -423,6 +389,15 @@ NotAfter_Label.place(relx=0.6,rely=0.7,anchor='c')
 NotAfter_Entry = tkinter.Entry(certificateTab,state='disabled')
 NotAfter_Entry.place(relx=0.6,rely=0.775,anchor='c',relwidth=0.5)
 
+def stripT():
+    Thumbprint_Entry.config(state='normal')
+    hold = Thumbprint_Entry.get()
+    hold = hold.replace(':','')
+    Thumbprint_Entry.delete(0,'end')
+    Thumbprint_Entry.insert('end',hold)
+    Thumbprint_Entry.config(state='readonly')
+
+
 def viewCrt():
     ccrt = certsList.get(str(certsList.curselection()).replace(',','').replace('(','').replace(')',''))
     choosen = {"ViewCertificateDetails":{"CertificateObject": ""}}
@@ -434,6 +409,8 @@ def viewCrt():
     Thumbprint_Entry.delete(0,'end')
     Thumbprint_Entry.insert('end','{}'.format(cert['fingerprint-sha1']))
     Thumbprint_Entry.config(state='readonly')
+    stripThumb = tkinter.Button(certificateTab,text='Strip',command=lambda:stripT())
+    stripThumb.place(relx=0.90,rely=0.175,anchor='c')
     Serial_Entry.config(state='normal')
     Serial_Entry.delete(0,'end')
     Serial_Entry.insert('end','{}'.format(cert['SerialNumber']['value']))
@@ -559,8 +536,61 @@ allObjects_Checkbox.place(relx=0.26,rely=0.315,anchor='w')
 changeName_Button = tkinter.Button(gatewayTab,text='Change Name',command=lambda:changeName())
 changeName_Button.place(relx=0.265,rely=0.225,anchor='w')
 ## WIP
-RefreshWSDL_Button = tkinter.Button(gatewayTab,text='Refresh WSDL',command=lambda:RefreshWSDL())
+RefreshWSDL_Button = tkinter.Button(gatewayTab,text='Refresh WSDLs',command=lambda:RefreshWSDL())
 RefreshWSDL_Button.place(relx=0.735,rely=0.225,anchor='e')
 #Gateway Tab Stop
+#Users tabs Start
+uList = tkinter.Listbox(userTab,selectmode='single')
+uList.place(relx=0.01,rely=0.55,relwidth=0.4,relheight=0.9,anchor='w')
+tkinter.Label(userTab,text='Users').place(relx=0.15,rely=0.05,anchor='w')
+u_data = requests.get(BaseURL+'mgmt/config/default/User',auth=(Username,Password),verify=False,timeout=3)
+u_data = json.loads(u_data.text)['User']
+for u in u_data:
+    uList.insert('end',u['name'] +' → '+u['AccessLevel'])
+
+
+def changePassword():
+        choosenUser = uList.get(str(uList.curselection()).replace(',','').replace('(','').replace(')',''))
+        choosenUser = choosenUser.split('→')[0].rstrip()
+        print(choosenUser)
+        data={"ChangePassword":{"OldPassword":"","Password":""}}
+        oldPassword = tkinter.simpledialog.askstring('Old Password','Password:')
+        newPassword = tkinter.simpledialog.askstring('New Password','Password:')
+        data['ChangePassword']['Password'] = newPassword
+        data['ChangePassword']['OldPassword'] = oldPassword
+        resp = requests.post(BaseURL+'mgmt/actionqueue/default',json=data,auth=(choosenUser,oldPassword),verify=False,timeout=3)
+        if resp.status_code == 200:
+            tkinter.messagebox.showinfo('Datapower Information','Password changed successfully')
+        if resp.status_code == 401:
+            tkinter.messagebox.showinfo('Datapower Information','the password you have entered isnt correct')
+        if 'previously' in resp.text:
+            tkinter.messagebox.showinfo('Datapower Information','Cannot use the same password. try again')
+
+
+Users = requests.get(BaseURL+'mgmt/status/default/ActiveUsers',auth=(Username,Password),verify=False,timeout=3)
+usersList = tkinter.Listbox(userTab)
+usersList.place(relx=0.8,rely=0.55,anchor='center',relwidth=0.4,relheight=0.9)
+tkinter.Label(userTab,text='Active Users').place(relx=0.775,rely=0.05,anchor='center')
+if type(json.loads(Users.text)['ActiveUsers']) == list:
+    for user in json.loads(Users.text)['ActiveUsers']:
+        if user['name'] == '':
+            usersList.insert('end','IDG : '+user['address']+' → '+user['connection'])
+        else:
+            usersList.insert('end',user['name']+' : '+user['address']+' → '+user['connection'])
+else:
+    if json.loads(Users.text)['ActiveUsers']['name'] == '':
+        usersList.insert('end','IDG : '+user['address']+' → '+user['connection'])
+    else:
+        usersList.insert('end',json.loads(Users.text)['ActiveUsers']['name']+' : '+json.loads(Users.text)['ActiveUsers']['address']+' → '+json.loads(Users.text)['ActiveUsers']['connection'])
+
+
+tkinter.Label(userTab,text='↓ Current User ↓\n'+Username).place(relx=0.5,rely=0.2,anchor='c')
+changePassword_Button = tkinter.Button(userTab,text='Change\nPassword',command=lambda:changePassword())
+changePassword_Button.place(relx=0.5,rely=0.325,anchor='c',relheight=0.125)
+
+
+
+
+#Users tabs stop
 
 MainWindow.mainloop()
