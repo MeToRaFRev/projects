@@ -12,7 +12,7 @@ urllib3.disable_warnings()
 #Parameters
 BaseURL = 'https://192.168.104.73:5554/'
 Username = 'rest-test'
-Password = '123321'
+Password = '123321123'
 Virtual = False
 #End
 #DPOnline Check
@@ -126,7 +126,7 @@ tkinter.Label(systemTab,text='Model: {}'.format(Model)).place(relx=0.01,rely=0.4
 tkinter.Label(systemTab,text='UP-Time: {}'.format(UPTime)).place(relx=0.01,rely=0.5,anchor='w')
 tkinter.Label(systemTab,text='Memory: {}/{} GB'.format(MemoryUsed,MemoryMax)).place(relx=0.01,rely=0.6,anchor='w')
 tkinter.Label(systemTab,text='CPU: {}%'.format(CPUUsage)).place(relx=0.01,rely=0.7,anchor='w')
-tkinter.Button(systemTab,text='Storage: {}/{} GB'.format(UsedEncrypted,TotalEncrypted),relief='flat',command=lambda:AdvStorage(Storage)).place(relx=0.01,rely=0.7,anchor='w')
+tkinter.Button(systemTab,text='Storage: {}/{} GB'.format(UsedEncrypted,TotalEncrypted),cursor='hand2',relief='flat',command=lambda:AdvStorage(Storage)).place(relx=0.01,rely=0.7,anchor='w')
 tkinter.Label(systemTab,text='License: {}'.format(Licensed)).place(relx=0.01,rely=0.8,anchor='w')
 tkinter.Label(systemTab,text='NTP Server: '+NTPRefresh).place(relx=0.01,rely=0.9,anchor='w')
 
@@ -157,12 +157,14 @@ systemTab.focus()
 #System Tab End
 #DNS Tab Start
 def DNSCache():
-    data = {"FlushDNSCache":""}
-    resp = requests.post(BaseURL+'mgmt/actionqueue/default',json=data,auth=(Username,Password),verify=False,timeout=3)
-    if resp.status_code == 200:
-        tkinter.messagebox.showinfo('Datapower Information','DNS Cache Refreshed Successfully')
-    else:
-        tkinter.messagebox.showerror('Datapower Information','Something went wrong')
+    yesno = tkinter.messagebox.askquestion('Refreshing DNS Cache','Are you sure you want to refresh the DNS Cache?',icon = 'warning')
+    if yesno == 'yes':
+        data = {"FlushDNSCache":""}
+        resp = requests.post(BaseURL+'mgmt/actionqueue/default',json=data,auth=(Username,Password),verify=False,timeout=3)
+        if resp.status_code == 200:
+            tkinter.messagebox.showinfo('Datapower Information','DNS Cache Refreshed Successfully')
+        else:
+            tkinter.messagebox.showerror('Datapower Information','Something went wrong')
 
 def resetDnsList(dnsList):
     dnsList.config(state='normal')
